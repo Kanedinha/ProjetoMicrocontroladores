@@ -10,6 +10,7 @@
 #define ON 1
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <string.h>
 #include "i2c.h"
 #include "lcd4bits.h"
@@ -18,12 +19,15 @@
 
 uint8_t alarme = OFF;
 uint8_t tempo = 0;
+uint8_t config = OFF;
 
 unsigned char senha[]={};
-unsigned char key;
-unsigned char msg1[]={"Senha:"};
-unsigned char msg2[]={"Alarme OFF"};
+unsigned char msg1[]={"Senha:          "};
+unsigned char msg2[]={"Alarme OFF      "};
 
+char *concatena(){
+	
+}
 
 void atualizaLCD(unsigned char mensagem1[], unsigned char mensagem2[]){
 	lcd_clear();
@@ -31,31 +35,31 @@ void atualizaLCD(unsigned char mensagem1[], unsigned char mensagem2[]){
 	lcd_puts(mensagem1);
 	lcd_gotoxy(0,1);
 	lcd_puts(mensagem2);
-	lcd_puts(itoa(strlen(senha)));
 }
-
 
 void setup(){
 	lcd4bits_inic();
-	USART_Init(UBRRCTE);
+	
+	DDRC |= (1 << DDC0)|(1 << DDC1);
+	DDRC &= ~(1 << DDC2);
 	atualizaLCD(msg1, msg2);
 }
 
-void func(){
-		for(int i=0; i<4; i++){
-			key = read_keypad();
-			if(key != '\0'){
-				strcat(&senha, &key);
-				strcat(&msg1, &senha);
-				if(strlen(senha)==4){
-					alarme = ON;
-					senha = '\0';
-					
-				}
-			}
+void verificaConfig(){
+	if(!(PORTC & (1 << DDC2)){
+		config = ON;
+	}
+}
+
+char *teclado(){
+	uint8_t key;
+	key = read_keypad();
+	if(key != '\0'){;
+		strcat(&msg1, key);
+		if(strlen(senha)==4){
+			alarme = ON;
 		}
-	USART_SendSRAM(key);
-	USART_Transmit(13);
+	}	
 	if(alarme == OFF){
 		strcpy(msg2, "Alarme OFF");
 	}
@@ -68,8 +72,9 @@ void func(){
 
 int main(void){
 	setup();
-    while (1) {
+	while (1) {
 		func();
+		_delay_ms(10);
 	}
 }
 
