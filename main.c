@@ -9,6 +9,8 @@
 #define AddrPCF8574 0x4E
 #define OFF 0
 #define ON 1
+#define FALSE 0
+#define TRUE 1
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -19,15 +21,17 @@
 
 uint8_t alarme = OFF; // flag do alarme
 uint8_t config = OFF; // flag da chave setup
+uint8_t timeout = FALSE;
+uint8_t senhaGrav = FALSE;
 
-uint8_t conta = 1000;
+uint16_t conta = 1000;
 uint8_t length = 0; 
 uint8_t tempo = 0;
 
-unsigned char senha[] = {};
-unsigned char msg1[] = {"Senha:          "};
-unsigned char msg2[] = {"Alarme OFF      "};
-
+unsigned char senha[4];
+unsigned char *msg1 = "Senha:";
+unsigned char *msg2 = "Alarme OFF";
+	
 void atualizaLCD(unsigned char mensagem1[], unsigned char mensagem2[]){
 	lcd_clear();
 	lcd_gotoxy(0,0);
@@ -38,16 +42,16 @@ void atualizaLCD(unsigned char mensagem1[], unsigned char mensagem2[]){
 
 ISR(TIMER0_OVF_vect)
 {
-	TCNT0=100; 
+	TCNT0 = 100; 
 	conta--; 	
 	if(conta==0) { 
-		conta=1000;
-		length = 0;
-		for(int i = 0; i < 4; i++){
-			senha[i] = '\0';
-		} 
-		*msg2 = "Setup timeout";
+		conta = 1000;
+		timeout = TRUE;
 	}
+}
+
+ISR(TIMER2_OVF_vect){
+	
 }
 
 void setup(){
@@ -68,15 +72,14 @@ void setup(){
 	sei();
 	
 	atualizaLCD(msg1, msg2);
-
 }
 
 void verificaConfig(){
-	if(!(PORTC & (0 << DDC2))){
-		config = 1;
+	if(!(PINC & (1 << DDC2))){
+		config = ON;
 	}
 	else {
-		config = 0;
+		config = OFF;
 	}
 }
 
@@ -91,39 +94,52 @@ int leituraSensor(){
 	return dado;
 }
 
-void recebeSenha(){
+void configSenha(){
 	char key = read_keypad();
-	if(length == 4){
-		//armazena na eeprom
-		*msg1 = NULL;
-		*msg2 = NULL;
-		*msg1 = "Senha:";
-		*msg1 = strcat((char*)msg1, (char*)senha);
-		*msg2 = "Senha na EEPROM";
-		atualizaLCD(msg1,msg2);
+	if(!timeout){
+		if(length < 4){
+			if(key != '\0'){
+				senha[length] = key;
+				msg1 = strcat(msg1, senha);
+				length = length + 1;
+				key = '\0';
+				conta = 1000;
+				TCNT0 = 100;
+				atualizaLCD(msg1, "Enter password");
+			}
+		}
+		else{
+			//grava na eeprom
+			for(int i = 0; i < 4; i++){
+				senha[i] = '\0';
+			}
+			length = 0;
+			atualizaLCD(msg1, "Senha na EEPROM");
+			_delay_ms(300);
+		}
 	}
-	if(key != '\0'){
-		senha[length] = key;
-		key = '\0';
-		length++;
-		*msg1 = strcat((char*)msg1, (char*)senha);
-		*msg2 = "insira a senha";
-		atualizaLCD(msg1,msg2);
+	else{
+		for(int i = 0; i < 4; i++){
+			senha[i] = '\0';
+		}
+		length = 0;
+		timeout = FALSE;
+		atualizaLCD(msg1, "Setup Timeout");
 	}
-	
 }
 
 int main(void){
 	setup();
 	while(1){
-		verificaConfig();
-		while(config == ON){
+		if(config == ON){
 			TIMSK0 = 0x01;
-			recebeSenha();
+			configSenha();
 			verificaConfig();
 		}
-		while(config == OFF){
+		if(config == OFF){
+			TIMSK0 = 0x00;
 			
+			atualizaLCD("Senha:", "Alarme OFF");
 			verificaConfig();
 		}
 	}
