@@ -54,6 +54,8 @@ ISR(TIMER2_OVF_vect){
 	
 }
 
+func(){}
+
 void setup(){
 	// periféricos
 	lcd4bits_inic();
