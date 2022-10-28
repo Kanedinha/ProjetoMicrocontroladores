@@ -31,8 +31,6 @@ uint8_t length = 0;
 uint8_t tempo = 0;
 
 unsigned char senha[4];
-unsigned char msg1[16];
-unsigned char msg2[16];
 	
 ISR(TIMER0_OVF_vect)
 {
@@ -67,8 +65,6 @@ void setup(){
 	TIMSK2=0x00; // temporizador inicia desligado
 	
 	sei();
-	
-	msg1 = "Senha:";
 }
 
 void verificaConfig(){
