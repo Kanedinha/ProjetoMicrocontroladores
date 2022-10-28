@@ -42,12 +42,7 @@ ISR(TIMER0_OVF_vect)
 	if(conta == 0) { 
 		conta = 1000;
 		timeout = TRUE;
-	}
-	if(t_timeout == 0){
-		t_timeout = 80;
-		timeout = FALSE;
-	}
-	
+	}	
 }
 
 void setup(){
@@ -64,7 +59,7 @@ void setup(){
 	TCCR0A=(0<<COM0A1) | (0<<COM0A0) | (0<<COM0B1) | (0<<COM0B0) | (0<<WGM01) | (0<<WGM00);
 	TCCR0B=(0<<WGM02) | (1<<CS02) | (0<<CS01) | (1<<CS00);
 	TCNT0=100; // 10ms.
-	TIMSK0=0x01; // temporizador inicia desligado 
+	TIMSK0=0x00; // temporizador inicia desligado 
 	
 	TCCR2A=(0<<COM2A1) | (0<<COM2A0) | (0<<COM2B1) | (0<<COM2B0) | (0<<WGM21) | (0<<WGM20);
 	TCCR2B=(0<<WGM22) | (1<<CS22) | (0<<CS21) | (1<<CS20);
@@ -97,48 +92,43 @@ int leituraSensor(){
 }
 
 void configSenha(){
-	char key = read_keypad();
-	if(!timeout){
-		if(length < 4){
-			if(key != '\0'){
-				senha[length] = key;
-				msg1 = strcat(msg1, key);
-				length = length + 1;
+	lcd_gotoxy(0,1);
+	lcd_puts("Insira PWD 4-Dig");
+	lcd_gotoxy(0,0);
+	lcd_puts("Senha:      ");
+	lcd_gotoxy(6,0);
+	while(length < 4){
+		if(!timeout){
+		char key = read_keypad();
+			if(key != '\0' && key != '*' && key != '#'){
+				senha[lenbgth] = key;
+				lcd_putschar(key);
 				key = '\0';
 				conta = 1000;
 				TCNT0 = 100;
-				*msg2 = "Enter Password";
 			}
 		}
 		else{
-			//grava na eeprom
-			for(int i = 0; i < 4; i++){
-				senha[i] = '\0';
-			}
-			length = 0;
-			*msg2 = "Senha na EEPROM";
+			lcd_gotoxy(0,1);
+			lcd_puts("Setup Timeout   ");
 		}
 	}
-	else{
-		for(int i = 0; i < 4; i++){
-			senha[i] = '\0';
-		}
-		length = 0;
-		timeout = FALSE;
-		*msg2 = "Setup timeout";
+	for(int i = 0;)
+		eeprom_write(i,senha[i]);
 	}
 }
 
 int main(void){
 	setup();
 	if(config == ON){
+		TIMSK0 = 0x01;
 		configSenha();
 	}
 	while(1){
 		if(config == OFF){
 			TIMSK0 = 0x00;
-		
-			verificaConfig();
+			
+			
 		}
 	}
 }
