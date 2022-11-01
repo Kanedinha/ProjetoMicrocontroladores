@@ -4,6 +4,7 @@
 #define ON 1
 #define FALSE 0
 #define TRUE 1
+#define TEMPO 500
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -22,7 +23,8 @@ uint8_t tentativa = 0;
 uint8_t fps = 5;
 uint8_t length = 0;
 uint8_t testeLength = 0;
-uint8_t tempo = 0;
+uint16_t tempo = TEMPO;
+uint16_t tempoAux;
 
 unsigned char senha[4];
 unsigned char teste[4];
@@ -31,10 +33,15 @@ ISR(TIMER0_OVF_vect)
 {
 	TCNT0 = 100;
 	conta--;
-	
+	tempo--;	
 	if(conta == 0) {
 		conta = 1000;
 		timeout = TRUE;
+	}
+	if(tempo == 0){
+		tempo = TEMPO;
+		alarme = ON;
+		PORTC |= (1 << DDC0);
 	}
 }
 
@@ -53,11 +60,6 @@ void setup(){
 	TCCR0B=(0<<WGM02) | (1<<CS02) | (0<<CS01) | (1<<CS00);
 	TCNT0=100; // 10ms.
 	TIMSK0=0x00; // temporizador inicia desligado
-	
-	TCCR2A=(0<<COM2A1) | (0<<COM2A0) | (0<<COM2B1) | (0<<COM2B0) | (0<<WGM21) | (0<<WGM20);
-	TCCR2B=(0<<WGM22) | (1<<CS22) | (0<<CS21) | (1<<CS20);
-	TCNT2=100; // 10ms.
-	TIMSK2=0x00; // temporizador inicia desligado
 	
 	sei();
 }
@@ -111,57 +113,69 @@ void configSenha(){
 		}
 	}
 	for(int i = 0; i < 4; i++)
-		EEPROM_write	(i,senha[i]);
+		EEPROM_write(i,senha[i]);
 	lcd_gotoxy(0,1);
 	lcd_puts("Senha na EEPROM ");
 }
 
 void ligaAlarme(){
-	alarme = ON;
+	tempo = TEMPO;
+	TCNT0 = 100;
+	TIMSK0 = 0x01;
 	tentativa = 0;
-	PORTC |= (1 << DDC0);
 	lcd_gotoxy(0,0);
 	lcd_puts("Senha:      ");
-	lcd_gotoxy(0,1);
-	lcd_puts("Alarme ON       ");
 }
 
 void desligaAlarme(){
 	alarme = OFF;
+	TIMSK0 = 0x00;
+	tempo = TEMPO;
 	tentativa = 0;
 	PORTC &= ~(1 << DDC0);
 	lcd_gotoxy(0,0);
 	lcd_puts("Senha:      ");
-	lcd_gotoxy(0,1);
-	lcd_puts("Alarme OFF      ");
 }
 
 void testaSenha(){
-	
-		lcd_gotoxy(0,1);
-		if(alarme == OFF && tentativa == 0){
-			lcd_puts("Alarme OFF      ");
-		}
-		else if(alarme == ON && tentativa == 0){
-			lcd_puts("Alarme ON       ");
-		}
-		else if(tentativa == 3){
-			lcd_puts("invasão de PWD");
-			PORTC |= (1 << DDC1);
-		}
-		
-			
+		char aux;
 		lcd_gotoxy(0,0);
 		lcd_puts("Senha:      ");
 		lcd_gotoxy(6,0);
 		while(testeLength < 4){
-		char key = read_keypad();
+			// impressão no LCD
+			lcd_gotoxy(0,1);
+			if(alarme == ON && tentativa == 0){
+				lcd_puts("Alarme ON       ");
+			}
+			else if(alarme == OFF && tentativa == 0){
+				if(TIMSK0 == 0x00)
+				lcd_puts("Alarme OFF      ");
+				else{
+					lcd_puts("Ativo em:");
+					
+					aux = tempoAux/1000 + 48;
+					lcd_putchar(aux);
+					aux = ((tempoAux/100)%10) + 48;
+					lcd_putchar(aux);
+
+					lcd_puts("     ");
+				}
+			}
+			else if(tentativa == 3){
+				lcd_puts("invasão de PWD");
+				PORTC |= (1 << DDC1);
+			}
+			
+			// teste de senha
+			
+			char key = read_keypad();
 			if(key != '\0' && key != '*' && key != '#'){
 				teste[testeLength] = key;
 				lcd_putchar(key);
 				testeLength++;
 				key = '\0';
-			}
+				}
 		}
 		
 		for(int i = 0; i < 4 && valida == TRUE; i++){
@@ -170,7 +184,7 @@ void testaSenha(){
 		if(valida != TRUE){
 			tentativa++;
 			valida = TRUE;
-			char aux = 48 + tentativa;
+			aux = 48 + tentativa;
 			lcd_gotoxy(0,1);
 			lcd_puts("PWD NOK   ");
 			lcd_putchar(aux);
@@ -181,7 +195,6 @@ void testaSenha(){
 				ligaAlarme();
 			else
 				desligaAlarme();
-			tentativa = 0;
 			PORTC &= ~(1 << DDC1);
 		}
 		
@@ -199,7 +212,6 @@ int main(void){
 	}
 	while(1){
 		if(config == OFF){
-			TIMSK0 = 0x00;
 			testaSenha();
 		}
 	}
