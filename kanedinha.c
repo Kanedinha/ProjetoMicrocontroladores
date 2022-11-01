@@ -4,7 +4,7 @@
 #define ON 1
 #define FALSE 0
 #define TRUE 1
-#define TEMPO 500
+#define TEMPO 1000
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -15,16 +15,15 @@
 
 uint8_t alarme = OFF; // flag do alarme
 uint8_t config = OFF; // flag da chave setup
+uint8_t sirene = OFF;
 uint8_t timeout = FALSE;
 uint8_t valida = TRUE;
 
 uint16_t conta = 1000;
 uint8_t tentativa = 0;
-uint8_t fps = 5;
 uint8_t length = 0;
 uint8_t testeLength = 0;
 uint16_t tempo = TEMPO;
-uint16_t tempoAux;
 
 unsigned char senha[4];
 unsigned char teste[4];
@@ -80,12 +79,10 @@ void leEEPROM(){
 
 int leituraSensor(){
 	unsigned int dado = 0;
-	I2C_Inic();
 	I2C_Start();
 	I2C_WrAddr(AddrPCF8574+I2C_RD);
 	dado=I2C_GetNACK();
 	I2C_Stop();
-	_delay_ms(1000);
 	return dado;
 }
 
@@ -132,6 +129,7 @@ void desligaAlarme(){
 	TIMSK0 = 0x00;
 	tempo = TEMPO;
 	tentativa = 0;
+	sirene = OFF;
 	PORTC &= ~(1 << DDC0);
 	lcd_gotoxy(0,0);
 	lcd_puts("Senha:      ");
@@ -141,7 +139,6 @@ void testaSenha(){
 		char aux;
 		lcd_gotoxy(0,0);
 		lcd_puts("Senha:      ");
-		lcd_gotoxy(6,0);
 		while(testeLength < 4){
 			// impressão no LCD
 			lcd_gotoxy(0,1);
@@ -150,25 +147,32 @@ void testaSenha(){
 			}
 			else if(alarme == OFF && tentativa == 0){
 				if(TIMSK0 == 0x00)
-				lcd_puts("Alarme OFF      ");
+					lcd_puts("Alarme OFF      ");
 				else{
 					lcd_puts("Ativo em:");
 					
-					aux = tempoAux/1000 + 48;
+					aux = tempo/1000 + 48;
 					lcd_putchar(aux);
-					aux = ((tempoAux/100)%10) + 48;
+					aux = ((tempo/100)%10) + 48;
 					lcd_putchar(aux);
 
 					lcd_puts("     ");
 				}
 			}
-			else if(tentativa == 3){
+			else if(sirene == ON){
 				lcd_puts("invasão de PWD");
 				PORTC |= (1 << DDC1);
 			}
+			else if(tentativa < 3 && tentativa > 0){
+				aux = 48 + tentativa;
+				lcd_gotoxy(0,1);
+				lcd_puts("PWD NOK   ");
+				lcd_putchar(aux);
+				lcd_puts("/3");
+			}
 			
+			lcd_gotoxy(6 + testeLength,0);
 			// teste de senha
-			
 			char key = read_keypad();
 			if(key != '\0' && key != '*' && key != '#'){
 				teste[testeLength] = key;
@@ -177,21 +181,18 @@ void testaSenha(){
 				key = '\0';
 				}
 		}
-		
 		for(int i = 0; i < 4 && valida == TRUE; i++){
 			valida = senha[i] == teste[i];
 		}
 		if(valida != TRUE){
-			tentativa++;
+			if(tentativa < 3)
+				tentativa++;
+			if(tentativa == 3)
+				sirene = ON;
 			valida = TRUE;
-			aux = 48 + tentativa;
-			lcd_gotoxy(0,1);
-			lcd_puts("PWD NOK   ");
-			lcd_putchar(aux);
-			lcd_puts("/3");
 		}
 		else{
-			if(alarme == OFF)
+			if(alarme == OFF && sirene == OFF)
 				ligaAlarme();
 			else
 				desligaAlarme();
@@ -200,6 +201,10 @@ void testaSenha(){
 		
 		testeLength = 0;
 
+}
+
+void leSensor(){
+	
 }
 
 int main(void){
