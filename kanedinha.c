@@ -141,13 +141,11 @@ void testaSenha(){
 		lcd_gotoxy(0,1);
 		if(alarme == OFF && tentativa == 0){
 			lcd_puts("Alarme OFF      ");
-			PORTC &= ~(1 << DDC1);
 		}
 		else if(alarme == ON && tentativa == 0){
 			lcd_puts("Alarme ON       ");
-			PORTC &= ~(1 << DDC1);
 		}
-		else{
+		else if(tentativa == 3){
 			lcd_puts("invasão de PWD");
 			PORTC |= (1 << DDC1);
 		}
@@ -184,6 +182,7 @@ void testaSenha(){
 			else
 				desligaAlarme();
 			tentativa = 0;
+			PORTC &= ~(1 << DDC1);
 		}
 		
 		testeLength = 0;
