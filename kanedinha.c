@@ -183,7 +183,7 @@ void testaSenha(){
 				else if(tentativa < 3 && tentativa > 0){
 					aux = 48 + tentativa;
 					lcd_gotoxy(0,1);
-					lcd_puts("PWD NOK   ");
+					lcd_puts("PWD NOK     ");
 					lcd_putchar(aux);
 					lcd_puts("/3");
 				}
@@ -211,7 +211,22 @@ void testaSenha(){
 				lcd_gotoxy(0,1);
 				lcd_puts("Timeout PWD CLR ");
 				_delay_ms(700);
-			
+				
+				tentativa++;
+				conta = 1000;
+				TCNT0 = 100;
+				timeout = FALSE;
+			}
+			if(timeout && (testeLength > 0) && alarme == OFF){
+				testeLength = 0;
+				key = '\0';
+				
+				lcd_gotoxy(6,0);
+				lcd_puts("    ");
+				lcd_gotoxy(0,1);
+				lcd_puts("Timeout PWD CLR ");
+				_delay_ms(700);
+				
 				conta = 1000;
 				TCNT0 = 100;
 				timeout = FALSE;
