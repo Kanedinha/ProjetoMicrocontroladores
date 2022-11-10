@@ -50,6 +50,17 @@ ISR(TIMER0_OVF_vect)
 	
 }
 
+ISR(TIMER2_OVF_vect){
+	TCNT2 = 100;
+	conta2--;
+	
+	if(conta2 == 0) {
+		conta2 = 1000;
+		timeout2 = TRUE;
+	}
+	
+}
+
 
 void setup(){
 	// periféricos
@@ -67,9 +78,9 @@ void setup(){
 	TCNT0 = 100; // 10ms.
 	TIMSK0 = 0x00; // temporizador inicia desligado
 
-	TCCR2B = (1 << CS02) | (1 << CS00);
+	TCCR2B = (1 << CS22) | (1 << CS21) | (1 << CS20);
 	TCNT2 = 100;
-	TIMSK2 = 0x00;
+	TIMSK2 = 0x01;
 	
 	sei();
 }
@@ -156,52 +167,57 @@ void testaSenha(){
 		lcd_gotoxy(0,0);
 		lcd_puts("Senha:      ");
 		while(testeLength < 4){
-
-				// impressão no LCD
-				lcd_gotoxy(0,1);
-				if(alarme == ON && tentativa == 0 && sirene == OFF){
-					lcd_puts("Alarme ON       ");
-				}
-				else if(alarme == OFF && tentativa == 0){
-					if(TIMSK0 == 0x00)
-						lcd_puts("Alarme OFF      ");
-					else{
-						lcd_puts("Ativo em:");
+			// impressão no LCD
+			lcd_gotoxy(0,1);
+			if(alarme == ON && tentativa == 0 && sirene == OFF){
+				lcd_puts("Alarme ON       ");
+			}
+			else if(alarme == OFF && tentativa == 0){
+				if(TIMSK0 == 0x00)
+					lcd_puts("Alarme OFF      ");
+				else{
+					lcd_puts("Ativo em:");
 						
-						aux = tempo/1000 + 48;
-						lcd_putchar(aux);
-						aux = ((tempo/100)%10) + 48;
-						lcd_putchar(aux);
-	
-						lcd_puts("     ");
-					}
-				}
-				else if(sirene == ON && tentativa == 3){
-					lcd_puts("invasão de PWD");
-					PORTC |= (1 << DDC1);
-				}
-				else if(tentativa < 3 && tentativa > 0){
-					aux = 48 + tentativa;
-					lcd_gotoxy(0,1);
-					lcd_puts("PWD NOK     ");
+					aux = tempo/1000 + 48;
 					lcd_putchar(aux);
-					lcd_puts("/3");
+					aux = ((tempo/100)%10) + 48;
+					lcd_putchar(aux);
+	
+					lcd_puts("     ");
 				}
+			}
+			else if(sirene == ON && tentativa == 3){
+				lcd_puts("invasao de PWD  ");
+				PORTC |= (1 << DDC1);
+			}
+			else if(tentativa < 3 && tentativa > 0){
+				aux = 48 + tentativa;
+				lcd_gotoxy(0,1);
+				lcd_puts("PWD NOK     ");
+				lcd_putchar(aux);
+				lcd_puts("/3 ");
+			}
 			
-				lcd_gotoxy(6 + testeLength,0);
+			lcd_gotoxy(6 + testeLength,0);
 			
-				// teste de senha
-				key = read_keypad();
-				if(key != '\0' && key != '*' && key != '#'){
-					teste[testeLength] = key;
-					lcd_putchar(key);
-					_delay_ms(300);
-					testeLength++;
-					key = '\0';
-					conta = 1000;
-					TCNT0 = 100;
-					timeout = FALSE;
-				}
+			// teste de senha
+			key = read_keypad();
+			if(key != '\0' && key != '*' && key != '#'){
+				teste[testeLength] = key;
+				lcd_putchar(key);
+				_delay_ms(300);
+				
+				testeLength++;
+				key = '\0';
+				
+				conta = 1000;
+				TCNT0 = 100;
+				timeout = FALSE;
+				
+				conta2 = 1000;
+				TCNT2 = 100;
+				timeout2 = FALSE;
+			}
 			if(timeout && (testeLength > 0) && alarme == ON){
 				testeLength = 0;
 				key = '\0';
@@ -210,14 +226,14 @@ void testaSenha(){
 				lcd_puts("    ");
 				lcd_gotoxy(0,1);
 				lcd_puts("Timeout PWD CLR ");
-				_delay_ms(700);
+				_delay_ms(1000);
 				
 				tentativa++;
 				conta = 1000;
 				TCNT0 = 100;
 				timeout = FALSE;
 			}
-			if(timeout && (testeLength > 0) && alarme == OFF){
+			if(timeout2 && (testeLength > 0) && alarme == OFF){
 				testeLength = 0;
 				key = '\0';
 				
@@ -225,11 +241,11 @@ void testaSenha(){
 				lcd_puts("    ");
 				lcd_gotoxy(0,1);
 				lcd_puts("Timeout PWD CLR ");
-				_delay_ms(700);
+				_delay_ms(1000);
 				
-				conta = 1000;
-				TCNT0 = 100;
-				timeout = FALSE;
+				conta2 = 1000;
+				TCNT2 = 100;
+				timeout2 = FALSE;
 			}
 		}
 		
@@ -238,7 +254,7 @@ void testaSenha(){
 		}
 		
 		if(valida != TRUE){
-			if(tentativa < 3)
+			if(tentativa < 3 && alarme == ON)
 				tentativa++;
 			else if(tentativa == 3)
 				sirene = ON;
