@@ -4,22 +4,22 @@
 #include <util/delay.h>
 // Vetor de caracteres ascii na matriz de teclas 3x4 e caracter null
 char ascii[13] = {'1','2','3','4','5','6','7','8','9','*','0','#','\0'};
-// Configura linhas como pinos de saída e colunas como pinos de entrada
+// Configura linhas como pinos de saÃ­da e colunas como pinos de entrada
 void row_output_column_input()
 {
-	// Seta linhas como saída
+	// Seta linhas como saÃ­da
 	KP_DDR |= (1<<ROW0)|(1<<ROW1)|(1<<ROW2)|(1<<ROW3);
 	// Seta colunas como entrada
 	KP_DDR &= ~((1<<COL0)|(1<<COL1)|(1<<COL2)|(1<<COL3));
 	// Pullups nas entradas
 	KP_PORT = (1<<COL0)|(1<<COL1)|(1<<COL2)|(1<<COL3);
 }
-// Configura linhas como pinos de entrada e colunas como pinos de saída
+// Configura linhas como pinos de entrada e colunas como pinos de saÃ­da
 void row_input_column_output()
 {
 	// Seta linhas como entradas
 	KP_DDR &= ~((1<<ROW0)|(1<<ROW1)|(1<<ROW2)|(1<<ROW3));
-	// Seta colunas como saídas
+	// Seta colunas como saÃ­das
 	KP_DDR |= (1<<COL0)|(1<<COL1)|(1<<COL2)|(1<<COL3);
 	// Pullups nas entradas
 	KP_PORT = (1<<ROW0)|(1<<ROW1)|(1<<ROW2)|(1<<ROW3);
@@ -45,13 +45,14 @@ unsigned char scan_keys()
 }
 unsigned char read_keypad()
 {
-	uint8_t key='\0',index;
+	char key='\0',
+	uint8_t index;
 	row_output_column_input();
 	// Verifica se NL=0 em alguma coluna
 	if((KP_PIN & COLS) != COLS) {
 		// Debounce
 		_delay_ms(10);
-		// Se tecla ainda pressionada após 10 ms, ação válida
+		// Se tecla ainda pressionada apÃ³s 10 ms, aÃ§Ã£o vÃ¡lida
 		if((KP_PIN & COLS) != COLS) {
 			index=scan_keys();
 			key=ascii[index];
