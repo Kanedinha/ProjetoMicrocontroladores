@@ -1,16 +1,10 @@
-/*
- * ProjetoAlarme.c
- *
- * Created: 20/10/2022 10:56:24
- * Author : Emers
- */ 
-
 #define F_CPU 16000000UL
-#define AddrPCF8574 0x4E
+#define AddrPCF8574 0x40
 #define OFF 0
 #define ON 1
 #define FALSE 0
 #define TRUE 1
+#define TEMPO 500
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -21,40 +15,52 @@
 
 uint8_t alarme = OFF; // flag do alarme
 uint8_t config = OFF; // flag da chave setup
+uint8_t sirene = OFF;
 uint8_t timeout = FALSE;
-uint8_t senhaGrav = FALSE;
+uint8_t timeout2 = FALSE; 
+uint8_t valida = TRUE;
+uint8_t lSensor = FALSE;
 
 uint16_t conta = 1000;
-uint8_t length = 0; 
-uint8_t tempo = 0;
+uint16_t conta2 = 1000;
+uint8_t tentativa = 0;
+uint8_t length = 0;
+uint8_t testeLength = 0;
+uint16_t tempo = TEMPO;
+uint8_t tSensor = 100;
 
 unsigned char senha[4];
-unsigned char *msg1 = "Senha:";
-unsigned char *msg2 = "Alarme OFF";
-	
-void atualizaLCD(unsigned char mensagem1[], unsigned char mensagem2[]){
-	lcd_clear();
-	lcd_gotoxy(0,0);
-	lcd_puts(mensagem1);
-	lcd_gotoxy(0,1);
-	lcd_puts(mensagem2);
-}
+unsigned char teste[4];
 
 ISR(TIMER0_OVF_vect)
 {
-	TCNT0 = 100; 
-	conta--; 	
-	if(conta==0) { 
+	TCNT0 = 100;
+	conta--;
+	tempo--;
+	
+	if(conta == 0) {
 		conta = 1000;
 		timeout = TRUE;
 	}
-}
-
-ISR(TIMER2_OVF_vect){
+	if(tempo == 0 && config == OFF){
+		tempo = TEMPO;
+		alarme = ON;
+		PORTC |= (1 << DDC0);
+	}
 	
 }
 
-func(){}
+ISR(TIMER2_OVF_vect){
+	TCNT2 = 100;
+	conta2--;
+	
+	if(conta2 == 0) {
+		conta2 = 1000;
+		timeout2 = TRUE;
+	}
+	
+}
+
 
 void setup(){
 	// periféricos
@@ -67,13 +73,16 @@ void setup(){
 	PORTC |= (1 << DDC2);
 	
 	// temporizador para o alarme
-	TCCR0A=(0<<COM0A1) | (0<<COM0A0) | (0<<COM0B1) | (0<<COM0B0) | (0<<WGM01) | (0<<WGM00);
-	TCCR0B=(0<<WGM02) | (1<<CS02) | (0<<CS01) | (1<<CS00);
-	TCNT0=100; // 10ms.
-	TIMSK0=0x00; // temporizador inicia desligado 
-	sei();
+	TCCR0A = (0<<COM0A1) | (0<<COM0A0) | (0<<COM0B1) | (0<<COM0B0) | (0<<WGM01) | (0<<WGM00);
+	TCCR0B = (0<<WGM02) | (1<<CS02) | (0<<CS01) | (1<<CS00);
+	TCNT0 = 100; // 10ms.
+	TIMSK0 = 0x00; // temporizador inicia desligado
+
+	TCCR2B = (1 << CS22) | (1 << CS21) | (1 << CS20);
+	TCNT2 = 100;
+	TIMSK2 = 0x01;
 	
-	atualizaLCD(msg1, msg2);
+	sei();
 }
 
 void verificaConfig(){
@@ -85,67 +94,245 @@ void verificaConfig(){
 	}
 }
 
+void leEEPROM(){
+	for(int i = 0; i < 4; i++)
+		senha[i] = EEPROM_read(i);
+}
+
 int leituraSensor(){
 	unsigned int dado = 0;
-	I2C_Inic();
-	I2C_Start(); 
-	I2C_WrAddr(AddrPCF8574+I2C_RD); 
-	dado=I2C_GetNACK(); 
-	I2C_Stop(); 
-	_delay_ms(1000); 
+	I2C_Start();
+	I2C_WrAddr(AddrPCF8574+I2C_RD);
+	dado=I2C_GetNACK();
+	I2C_Stop();
 	return dado;
 }
 
 void configSenha(){
-	char key = read_keypad();
-	if(!timeout){
-		if(length < 4){
-			if(key != '\0'){
+	lcd_gotoxy(0,1);
+	lcd_puts("Insira PWD 4-Dig");
+	lcd_gotoxy(0,0);
+	lcd_puts("Senha:      ");
+	lcd_gotoxy(6,0);
+	while(length < 4){
+		if(!timeout){
+			char key = read_keypad();
+			if(key != '\0' && key != '*' && key != '#'){
 				senha[length] = key;
-				msg1 = strcat(msg1, senha);
-				length = length + 1;
+				length++;
+				lcd_putchar(key);
 				key = '\0';
 				conta = 1000;
 				TCNT0 = 100;
-				atualizaLCD(msg1, "Enter password");
 			}
 		}
 		else{
-			//grava na eeprom
-			for(int i = 0; i < 4; i++){
-				senha[i] = '\0';
-			}
+			lcd_gotoxy(0,1);
+			lcd_puts("Setup Timeout   ");
+			_delay_ms(400);
+			lcd_puts("Try again       ");
 			length = 0;
-			atualizaLCD(msg1, "Senha na EEPROM");
-			_delay_ms(300);
+			timeout = FALSE;
 		}
 	}
-	else{
-		for(int i = 0; i < 4; i++){
-			senha[i] = '\0';
+	for(int i = 0; i < 4; i++)
+		EEPROM_write(i,senha[i]);
+	lcd_gotoxy(0,1);
+	lcd_puts("Senha na EEPROM ");
+}
+
+void ligaAlarme(){
+	tempo = TEMPO;
+	TCNT0 = 100;
+	TIMSK0 = 0x01;
+	tentativa = 0;
+	lcd_gotoxy(0,0);
+	lcd_puts("Senha:      ");
+}
+
+void desligaAlarme(){
+	alarme = OFF;
+	TIMSK0 = 0x00;
+	tempo = TEMPO;
+	tentativa = 0;
+	sirene = OFF;
+	PORTC &= ~(1 << DDC0);
+	lcd_gotoxy(0,0);
+	lcd_puts("Senha:      ");
+}
+
+void testaSenha(){
+		char aux;
+		char key;
+		lcd_gotoxy(0,0);
+		lcd_puts("Senha:      ");
+		while(testeLength < 4){
+			// impressão no LCD
+			lcd_gotoxy(0,1);
+			if(alarme == ON && tentativa == 0 && sirene == OFF){
+				lcd_puts("Alarme ON       ");
+			}
+			else if(alarme == OFF && tentativa == 0){
+				if(TIMSK0 == 0x00)
+					lcd_puts("Alarme OFF      ");
+				else{
+					lcd_puts("Ativo em:");
+						
+					aux = tempo/1000 + 48;
+					lcd_putchar(aux);
+					aux = ((tempo/100)%10) + 48;
+					lcd_putchar(aux);
+	
+					lcd_puts("     ");
+				}
+			}
+			else if(sirene == ON && tentativa == 3){
+				lcd_puts("invasao de PWD  ");
+				PORTC |= (1 << DDC1);
+			}
+			else if(tentativa < 3 && tentativa > 0){
+				aux = 48 + tentativa;
+				lcd_gotoxy(0,1);
+				lcd_puts("PWD NOK     ");
+				lcd_putchar(aux);
+				lcd_puts("/3 ");
+			}
+			
+			lcd_gotoxy(6 + testeLength,0);
+			
+			// teste de senha
+			key = read_keypad();
+			if(key != '\0' && key != '*' && key != '#'){
+				teste[testeLength] = key;
+				lcd_putchar(key);
+				_delay_ms(300);
+				
+				testeLength++;
+				key = '\0';
+				
+				conta = 1000;
+				TCNT0 = 100;
+				timeout = FALSE;
+				
+				conta2 = 1000;
+				TCNT2 = 100;
+				timeout2 = FALSE;
+			}
+			if(timeout && (testeLength > 0) && alarme == ON){
+				testeLength = 0;
+				key = '\0';
+				
+				lcd_gotoxy(6,0);
+				lcd_puts("    ");
+				lcd_gotoxy(0,1);
+				lcd_puts("Timeout PWD CLR ");
+				_delay_ms(1000);
+				
+				tentativa++;
+				conta = 1000;
+				TCNT0 = 100;
+				timeout = FALSE;
+			}
+			if(timeout2 && (testeLength > 0) && alarme == OFF){
+				testeLength = 0;
+				key = '\0';
+				
+				lcd_gotoxy(6,0);
+				lcd_puts("    ");
+				lcd_gotoxy(0,1);
+				lcd_puts("Timeout PWD CLR ");
+				_delay_ms(1000);
+				
+				conta2 = 1000;
+				TCNT2 = 100;
+				timeout2 = FALSE;
+			}
 		}
-		length = 0;
-		timeout = FALSE;
-		atualizaLCD(msg1, "Setup Timeout");
+		
+		for(int i = 0; i < 4 && valida == TRUE; i++){
+			valida = senha[i] == teste[i];
+		}
+		
+		if(valida != TRUE){
+			if(tentativa < 3 && alarme == ON)
+				tentativa++;
+			else if(tentativa == 3)
+				sirene = ON;
+			valida = TRUE;
+		}
+		else{
+			if(alarme == OFF && sirene == OFF)
+				ligaAlarme();
+			else
+				desligaAlarme();
+			PORTC &= ~(1 << DDC1);
+		}
+		
+		testeLength = 0;
+
+}
+
+void leSensor(){
+	int dado;
+	if(lSensor == TRUE){
+		dado = leituraSensor();
+		EEPROM_write(5, dado);
+		lSensor = FALSE;
+	}
+	if(dado > 0){
+		sirene = ON;
+		lcd_gotoxy(0,1);
+		lcd_puts("Violado:");
+		if(dado & 0x01)
+			lcd_putchar("1");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x02)
+			lcd_putchar("2");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x04)
+			lcd_putchar("3");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x08)
+			lcd_putchar("4");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x10)
+			lcd_putchar("5");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x20)
+			lcd_putchar("6");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x40)
+			lcd_putchar("7");
+		else
+			lcd_putchar(" ");
+		if(dado & 0x80)
+			lcd_putchar("8");
+		else
+			lcd_putchar(" ");
 	}
 }
 
 int main(void){
 	setup();
+	leEEPROM();
+	verificaConfig();
+	if(config == ON){
+		TIMSK0 = 0x01;
+		configSenha();
+	}
 	while(1){
-		if(config == ON){
-			TIMSK0 = 0x01;
-			configSenha();
-			verificaConfig();
-		}
 		if(config == OFF){
-			TIMSK0 = 0x00;
-			
-			atualizaLCD("Senha:", "Alarme OFF");
-			verificaConfig();
+			testaSenha();
+			if(alarme == ON){
+				leSensor();
+			}
 		}
 	}
 }
 
-//teste
-//oioi
