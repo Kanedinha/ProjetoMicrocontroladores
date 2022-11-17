@@ -25,7 +25,7 @@ void row_input_column_output()
 	KP_PORT = (1<<ROW0)|(1<<ROW1)|(1<<ROW2)|(1<<ROW3);
 }
 // Retorna index da tecla
-unsigned char scan_keys()
+uint8_t scan_keys()
 {
 	uint8_t key_index=0;
 	// Verifica as colunas
