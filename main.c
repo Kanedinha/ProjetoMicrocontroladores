@@ -66,6 +66,7 @@ void setup(){
 	// periféricos
 	lcd4bits_inic();
 	I2C_Inic();
+	UCSR0A = UCSR0B = UCSR0C = 0;
 	
 	// entrada do setup e saída dos leds
 	DDRC |= (1 << DDC0)|(1 << DDC1);
@@ -100,7 +101,7 @@ void leEEPROM(){
 }
 
 int leituraSensor(){
-	unsigned int dado = 0;
+	unsigned char dado = 0;
 	I2C_Start();
 	I2C_WrAddr(AddrPCF8574+I2C_RD);
 	dado=I2C_GetNACK();
