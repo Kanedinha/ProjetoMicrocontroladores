@@ -1,10 +1,3 @@
-/*
-By: 	Emerson Kaneda
-	Isabela Bello
-	Luiz
-*/
-
-
 #define F_CPU 16000000UL
 #define AddrPCF8574 0x40
 #define OFF 0
