@@ -71,7 +71,7 @@ ISR(TIMER2_OVF_vect){
 }
 
 
-void setup(){
+void inic_perfericos(){
 	// periféricos
 	lcd4bits_inic();
 	I2C_Inic();
@@ -293,10 +293,9 @@ void testaSenha(){
 void leSensor(){
 	
 	if(lSensor == TRUE){
-		sensores |= leituraSensor();
+		sensores = leituraSensor();
 		lSensor = FALSE;
 	}
-	EEPROM_write(5, sensores);
 	if(sensores > 0){
 		sirene = ON;
 		lcd_gotoxy(0,1);
@@ -337,7 +336,7 @@ void leSensor(){
 }
 
 int main(void){
-	setup();
+	inic_perfericos();
 	leEEPROM();
 	verificaConfig();
 	if(config == ON){
