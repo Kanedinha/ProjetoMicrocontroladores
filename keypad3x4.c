@@ -51,6 +51,8 @@ unsigned char read_keypad(){
 		if ((KP_PIN & COLS) != COLS){
 			index=scan_keys();
 			key=ascii[index];
-		while ((KP_PIN & COLS) != COLS);}} // Espera teclas liberadas
-		return key;
-	}
+		while ((KP_PIN & COLS) != COLS); // Espera teclas liberadas
+		}
+	} 
+	return key;
+}
