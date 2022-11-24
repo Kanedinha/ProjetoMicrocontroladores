@@ -21,6 +21,8 @@ uint8_t timeout2 = FALSE;
 uint8_t valida = TRUE;
 uint8_t lSensor = FALSE;
 
+uint8_t debug = 0;
+
 uint8_t sensores = 0;
 uint16_t conta = 1000;
 uint16_t conta2 = 1000;
@@ -260,15 +262,20 @@ void testaSenha(){
 			}
 		}
 		else{
+			
+			
 			for(int i = 0; i < 4 && valida == TRUE; i++){
 				valida = senha[i] == teste[i];
 			}
 		
 			if(valida != TRUE){
-				if(tentativa < 3 && alarme == ON)
+				if(tentativa < 2)
 					tentativa++;
-				else if(tentativa == 3)
+				else if(tentativa == 2){
 					sirene = ON;
+					tentativa++;
+				}
+
 				valida = TRUE;
 			}
 			else{
