@@ -11,9 +11,11 @@
 #define ROW1 1 // Pino de KP_PORT p/ linha 1
 #define ROW2 2 // Pino de KP_PORT p/ linha 2
 #define ROW3 3 // Pino de KP_PORT p/ linha 3
+#define ROWS ((1<<ROW0)|(1<<ROW1)|(1<<ROW2)|(1<<ROW3))
 #define COLS ((1<<COL0)|(1<<COL1)|(1<<COL2)|(1<<COL3))
 void row_output_column_input();
 void row_input_column_output();
+void en_pullups();
 unsigned char scan_keys();
 unsigned char read_keypad();
-#endif
+#endif
