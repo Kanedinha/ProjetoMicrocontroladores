@@ -4,7 +4,7 @@
 #define ON 1
 #define FALSE 0
 #define TRUE 1
-#define TEMPO 500
+#define TEMPO 1000
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -21,6 +21,9 @@ uint8_t timeout2 = FALSE;
 uint8_t valida = TRUE;
 uint8_t lSensor = FALSE;
 
+uint8_t debug = 0;
+
+uint8_t sensores = 0;
 uint16_t conta = 1000;
 uint16_t conta2 = 1000;
 uint8_t tentativa = 0;
@@ -37,17 +40,23 @@ ISR(TIMER0_OVF_vect)
 	TCNT0 = 100;
 	conta--;
 	tempo--;
+	tSensor--;
 	
 	if(conta == 0) {
 		conta = 1000;
 		timeout = TRUE;
 	}
-	if(tempo == 0){
-		tempo = TEMPO;
-		alarme = ON;
-		PORTC |= (1 << DDC0);
+	if(config == OFF){
+		if(tempo == 0){
+			tempo = TEMPO;
+			alarme = ON;
+			PORTC |= (1 << DDC0);
+		}
+		if(tSensor == 0){
+			lSensor = TRUE;
+			tSensor = 100;
+		}
 	}
-	
 }
 
 ISR(TIMER2_OVF_vect){
@@ -62,10 +71,11 @@ ISR(TIMER2_OVF_vect){
 }
 
 
-void setup(){
+void inic_perfericos(){
 	// periféricos
 	lcd4bits_inic();
 	I2C_Inic();
+	UCSR0A = UCSR0B = UCSR0C = 0;
 	
 	// entrada do setup e saída dos leds
 	DDRC |= (1 << DDC0)|(1 << DDC1);
@@ -100,7 +110,7 @@ void leEEPROM(){
 }
 
 int leituraSensor(){
-	unsigned int dado = 0;
+	unsigned char dado = 0;
 	I2C_Start();
 	I2C_WrAddr(AddrPCF8574+I2C_RD);
 	dado=I2C_GetNACK();
@@ -156,6 +166,7 @@ void desligaAlarme(){
 	tempo = TEMPO;
 	tentativa = 0;
 	sirene = OFF;
+	sensores = 0;
 	PORTC &= ~(1 << DDC0);
 	lcd_gotoxy(0,0);
 	lcd_puts("Senha:      ");
@@ -164,12 +175,15 @@ void desligaAlarme(){
 void testaSenha(){
 		char aux;
 		char key;
-		lcd_gotoxy(0,0);
-		lcd_puts("Senha:      ");
-		while(testeLength < 4){
+		if(testeLength == 0){
+			lcd_gotoxy(0,0);
+			lcd_puts("Senha:      ");
+		}
+		if(testeLength < 4){
 			// impressão no LCD
 			lcd_gotoxy(0,1);
 			if(alarme == ON && tentativa == 0 && sirene == OFF){
+				
 				lcd_puts("Alarme ON       ");
 			}
 			else if(alarme == OFF && tentativa == 0){
@@ -188,7 +202,6 @@ void testaSenha(){
 			}
 			else if(sirene == ON && tentativa == 3){
 				lcd_puts("invasao de PWD  ");
-				PORTC |= (1 << DDC1);
 			}
 			else if(tentativa < 3 && tentativa > 0){
 				aux = 48 + tentativa;
@@ -248,78 +261,83 @@ void testaSenha(){
 				timeout2 = FALSE;
 			}
 		}
-		
-		for(int i = 0; i < 4 && valida == TRUE; i++){
-			valida = senha[i] == teste[i];
-		}
-		
-		if(valida != TRUE){
-			if(tentativa < 3 && alarme == ON)
-				tentativa++;
-			else if(tentativa == 3)
-				sirene = ON;
-			valida = TRUE;
-		}
 		else{
-			if(alarme == OFF && sirene == OFF)
-				ligaAlarme();
-			else
-				desligaAlarme();
-			PORTC &= ~(1 << DDC1);
-		}
+			
+			
+			for(int i = 0; i < 4 && valida == TRUE; i++){
+				valida = senha[i] == teste[i];
+			}
 		
-		testeLength = 0;
+			if(valida != TRUE){
+				if(tentativa < 2)
+					tentativa++;
+				else if(tentativa == 2){
+					sirene = ON;
+					tentativa++;
+				}
 
+				valida = TRUE;
+			}
+			else{
+				if(alarme == OFF && sirene == OFF)
+					ligaAlarme();
+				else
+					desligaAlarme();
+				PORTC &= ~(1 << DDC1);
+			}
+		
+			testeLength = 0;
+		}
 }
 
 void leSensor(){
-	int dado;
+	
 	if(lSensor == TRUE){
-		dado = leituraSensor();
-		EEPROM_write(5, dado);
+		sensores = leituraSensor();
 		lSensor = FALSE;
+		if(sensores > 0)
+			sirene = ON;
 	}
-	if(dado > 0){
-		sirene = ON;
+	if(sirene == ON){
 		lcd_gotoxy(0,1);
 		lcd_puts("Violado:");
-		if(dado & 0x01)
-			lcd_putchar("1");
+		if(sensores & 0x01)
+			lcd_putchar('1');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x02)
-			lcd_putchar("2");
+			lcd_putchar(' ');
+		if(sensores & 0x02)
+			lcd_putchar('2');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x04)
-			lcd_putchar("3");
+			lcd_putchar(' ');
+		if(sensores & 0x04)
+			lcd_putchar('3');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x08)
-			lcd_putchar("4");
+			lcd_putchar(' ');
+		if(sensores & 0x08)
+			lcd_putchar('4');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x10)
-			lcd_putchar("5");
+			lcd_putchar(' ');
+		if(sensores & 0x10)
+			lcd_putchar('5');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x20)
-			lcd_putchar("6");
+			lcd_putchar(' ');
+		if(sensores & 0x20)
+			lcd_putchar('6');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x40)
-			lcd_putchar("7");
+			lcd_putchar(' ');
+		if(sensores & 0x40)
+			lcd_putchar('7');
 		else
-			lcd_putchar(" ");
-		if(dado & 0x80)
-			lcd_putchar("8");
+			lcd_putchar(' ');
+		if(sensores & 0x80)
+			lcd_putchar('8');
 		else
-			lcd_putchar(" ");
+			lcd_putchar(' ');
 	}
 }
 
 int main(void){
-	setup();
+	inic_perfericos();
 	leEEPROM();
 	verificaConfig();
 	if(config == ON){
@@ -329,9 +347,10 @@ int main(void){
 	while(1){
 		if(config == OFF){
 			testaSenha();
-			if(alarme == ON){
+			if(alarme == ON)
 				leSensor();
-			}
+			if(sirene == ON)
+				PORTC |= (1 << DDC1);
 		}
 	}
 }
